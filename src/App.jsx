@@ -1,122 +1,70 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import React, { useState } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { ScrollControls, Scroll } from '@react-three/drei';
+import ImmersiveParticles from './components/ImmersiveParticles';
+import Navbar from './components/navbar';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [currentPage, setPage] = useState('home');
+  const [scrollEl, setScrollEl] = useState(null);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <main className="relative w-full h-screen bg-slate-950 text-white overflow-hidden">
+      {/* Global persistent navigation bar */}
+      <Navbar currentPage={currentPage} setPage={setPage} scrollEl={scrollEl} />
 
-      <div className="ticks"></div>
+      {/* Interactive 3D Canvas Layer */}
+      <div className="absolute inset-0 z-0">
+        <Canvas camera={{ position: [0, 0, 4.2], fov: 60 }} dpr={[1, 1.5]}>
+          <ambientLight intensity={0.4} />
+          <ScrollControls pages={3} damping={0.25}>
+            
+            {/* Immersive Responsive Morphing/Shifting Particles */}
+            <ImmersiveParticles 
+              count={4000} 
+              setPage={setPage} 
+              setScrollEl={setScrollEl} 
+            />
+            
+            {/* DOM Scroll layer with balanced responsive layouts */}
+            <Scroll html>
+              
+              {/* Section 1: HOME (Centered Layout) */}
+              <div className="w-screen h-screen flex flex-col justify-center items-center px-6 md:px-12 pointer-events-none">
+                <h1 className="text-4xl sm:text-7xl md:text-8xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-indigo-400 drop-shadow-md">
+                  THE ORIGIN
+                </h1>
+                <p className="text-slate-400 mt-4 text-center max-w-xs sm:max-w-md text-xs sm:text-sm md:text-base font-medium leading-relaxed">
+                  We begin as a unified sphere. Scroll down or click the menu to disperse the structural grid into waves of pure fluid data.
+                </p>
+              </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+              {/* Section 2: WORK (Asymmetrical Left Layout on Desktop) */}
+              {/* On desktop: flex items are aligned to the left (md:items-start md:text-left) because particles shift to the right */}
+              <div className="w-screen h-screen flex flex-col justify-center items-center md:items-start px-6 md:px-24 pointer-events-none">
+                <h1 className="text-4xl sm:text-7xl md:text-8xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 drop-shadow-md">
+                  PORTFOLIO
+                </h1>
+                <p className="text-slate-400 mt-4 text-center md:text-left max-w-xs sm:max-w-md text-xs sm:text-sm md:text-base font-medium leading-relaxed">
+                  This is where waves of logic and data shape into real digital products. Hover and drag to interact with the terrain mesh.
+                </p>
+              </div>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+              {/* Section 3: CONTACT (Asymmetrical Right Layout on Desktop) */}
+              {/* On desktop: flex items are aligned to the right (md:items-end md:text-right) because particles shift to the left */}
+              <div className="w-screen h-screen flex flex-col justify-center items-center md:items-end px-6 md:px-24 pointer-events-none">
+                <h1 className="text-4xl sm:text-7xl md:text-8xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-rose-400 drop-shadow-md">
+                  CONNECT
+                </h1>
+                <p className="text-slate-400 mt-4 text-center md:text-right max-w-xs sm:max-w-md text-xs sm:text-sm md:text-base font-medium leading-relaxed">
+                  Our paths converge here. Reach out to collaborate or discuss building the next generation of custom creative systems.
+                </p>
+              </div>
+
+            </Scroll>
+          </ScrollControls>
+        </Canvas>
+      </div>
+    </main>
+  );
 }
-
-export default App

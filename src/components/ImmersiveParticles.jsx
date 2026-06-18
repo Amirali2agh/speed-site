@@ -1,9 +1,9 @@
-import React, { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useRef, useMemo, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useScroll } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 1. Math generators to define 3D coordinates for different shapes
+// 1. Math generators (Unchanged)
 const getSpherePositions = (count) => {
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -26,7 +26,7 @@ const getWavePositions = (count) => {
     const x = (i % size) / size - 0.5;
     const z = Math.floor(i / size) / size - 0.5;
     positions[i * 3] = x * 5;
-    positions[i * 3 + 1] = Math.sin(x * 8) * 0.4; // Wave oscillation depth
+    positions[i * 3 + 1] = Math.sin(x * 8) * 0.4;
     positions[i * 3 + 2] = z * 5;
   }
   return positions;
@@ -46,70 +46,122 @@ const getTorusPositions = (count) => {
   return positions;
 };
 
-// 2. Immersive Particle System Component
-export default function ImmersiveParticles({ count = 3600 }) {
+// 2. Immersive Particles with Advanced Spatial Shift
+export default function ImmersiveParticles({ count = 3600, setPage, setScrollEl }) {
   const pointsRef = useRef(null);
-  const scroll = useScroll(); // Hook to access smooth scroll metrics
+  const scroll = useScroll();
+  const { size } = useThree();
+  const isMobile = size.width < 768;
 
-  // Memoize positions to avoid recalculating heavy coordinate math on every render
+  const lastActivePage = useRef('home');
+
   const shapes = useMemo(() => ({
     sphere: getSpherePositions(count),
     wave: getWavePositions(count),
     torus: getTorusPositions(count),
-    current: new Float32Array(count * 3) // Temp storage to mutate in real-time
+    current: new Float32Array(count * 3)
   }), [count]);
 
-  // useFrame runs at 60fps to handle smooth interpolations and interactive shifts
+  const responsiveScale = isMobile ? 0.75 : 1.1;
+  const particleSize = isMobile ? 0.045 : 0.025;
+
+  // Sync scroll element reference
+  useEffect(() => {
+    if (setScrollEl && scroll.el) {
+      setScrollEl(scroll.el);
+    }
+  }, [scroll, setScrollEl]);
+
   useFrame((state) => {
     if (!pointsRef.current) return;
 
     const points = pointsRef.current;
     const positionAttr = points.geometry.attributes.position;
-    const scrollOffset = scroll.offset; // Normalized scroll progress (0 to 1)
+    const scrollOffset = scroll.offset;
 
-    // Morphing interpolation loop
+    // A. Vertex Morphing (Shape transformation)
     for (let i = 0; i < count * 3; i++) {
       let targetValue = 0;
-
       if (scrollOffset < 0.5) {
-        // Phase 1: Interpolate from Sphere to Wave
-        const t = scrollOffset * 2.0; // Map [0, 0.5] range to [0, 1]
+        const t = scrollOffset * 2.0;
         targetValue = THREE.MathUtils.lerp(shapes.sphere[i], shapes.wave[i], t);
       } else {
-        // Phase 2: Interpolate from Wave to Torus
-        const t = (scrollOffset - 0.5) * 2.0; // Map [0.5, 1.0] range to [0, 1]
+        const t = (scrollOffset - 0.5) * 2.0;
         targetValue = THREE.MathUtils.lerp(shapes.wave[i], shapes.torus[i], t);
       }
-
-      // Apply elastic lerp for high-quality, spring-like physical transition
       positionAttr.array[i] = THREE.MathUtils.lerp(positionAttr.array[i], targetValue, 0.08);
     }
-
-    // Mark the buffer geometry attribute as modified so WebGL knows to re-render it
     positionAttr.needsUpdate = true;
 
-    // Fluid camera-mouse interaction: rotate the coordinate space slightly on hover
-    points.rotation.x = THREE.MathUtils.lerp(points.rotation.x, state.pointer.y * 0.25, 0.05);
-    points.rotation.y = THREE.MathUtils.lerp(points.rotation.y, state.pointer.x * 0.25 + state.clock.getElapsedTime() * 0.03, 0.05);
+    // B. Physical 3D Spatial Translation (Moving the mesh in space based on scroll)
+    let targetX = 0;
+    let targetY = 0;
+    let targetZ = 0;
+
+    if (isMobile) {
+      // Mobile Layout: Shift up and down vertically so text doesn't overlap particles
+      if (scrollOffset < 0.5) {
+        const t = scrollOffset * 2.0;
+        targetY = THREE.MathUtils.lerp(0, -0.8, t); // Pushes particles down for Section 2
+      } else {
+        const t = (scrollOffset - 0.5) * 2.0;
+        targetY = THREE.MathUtils.lerp(-0.8, 0.8, t); // Pulls particles up for Section 3
+        targetZ = THREE.MathUtils.lerp(0, -0.5, t);
+      }
+    } else {
+      // Desktop Layout: Shift left and right horizontally for asymmetrical designs
+      if (scrollOffset < 0.5) {
+        const t = scrollOffset * 2.0;
+        targetX = THREE.MathUtils.lerp(0, 1.4, t); // Shifts particles to the right for Section 2
+        targetY = THREE.MathUtils.lerp(0, -0.2, t);
+      } else {
+        const t = (scrollOffset - 0.5) * 2.0;
+        targetX = THREE.MathUtils.lerp(1.4, -1.4, t); // Shifts particles to the left for Section 3
+        targetY = THREE.MathUtils.lerp(-0.2, 0.3, t);
+        targetZ = THREE.MathUtils.lerp(0, -0.6, t);
+      }
+    }
+
+    // Apply smooth linear interpolations to the physical group position
+    points.position.x = THREE.MathUtils.lerp(points.position.x, targetX, 0.06);
+    points.position.y = THREE.MathUtils.lerp(points.position.y, targetY, 0.06);
+    points.position.z = THREE.MathUtils.lerp(points.position.z, targetZ, 0.06);
+
+    // C. Detect active page and update UI
+    let activePage = 'home';
+    if (scrollOffset > 0.3 && scrollOffset <= 0.7) {
+      activePage = 'work';
+    } else if (scrollOffset > 0.7) {
+      activePage = 'contact';
+    }
+
+    if (activePage !== lastActivePage.current) {
+      lastActivePage.current = activePage;
+      setPage(activePage);
+    }
+
+    // D. Fluid mouse interactions with parallax rotation
+    const hoverFactor = isMobile ? 0.1 : 0.25;
+    points.rotation.x = THREE.MathUtils.lerp(points.rotation.x, state.pointer.y * hoverFactor, 0.05);
+    points.rotation.y = THREE.MathUtils.lerp(points.rotation.y, state.pointer.x * hoverFactor + state.clock.getElapsedTime() * 0.03, 0.05);
   });
 
   return (
-    <points ref={pointsRef}>
+    <points ref={pointsRef} scale={responsiveScale}>
       <bufferGeometry>
-        {/* We initially spawn particles using the Sphere positions array */}
         <bufferAttribute
           attach="attributes-position"
           args={[shapes.sphere, 3]}
         />
       </bufferGeometry>
       <pointsMaterial
-        color="#c084fc" // High-tech neon purple color
-        size={0.025} // Particle diameter
-        sizeAttenuation={true} // Makes particles smaller when far from the camera
+        color="#c084fc"
+        size={particleSize}
+        sizeAttenuation={true}
         transparent={true}
         opacity={0.8}
-        depthWrite={false} // Prevents particles from clipping/hiding behind each other
-        blending={THREE.AdditiveBlending} // Blends overlapping particles for glowing effect
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
       />
     </points>
   );
