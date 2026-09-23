@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useScroll } from '@react-three/drei';
 import * as THREE from 'three';
 
-// 1. Math generators (Unchanged)
+// 1. Math generators for main morphing shapes (Optimized counts)
 const getSpherePositions = (count) => {
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
@@ -46,11 +46,13 @@ const getTorusPositions = (count) => {
   return positions;
 };
 
-// 2. Immersive Particles with Advanced Spatial Shift
-export default function ImmersiveParticles({ count = 3600, setPage, setScrollEl }) {
+// 2. High-Performance Particle Engine
+export default function ImmersiveParticles({ count = 1600, setPage, setScrollEl }) {
   const pointsRef = useRef(null);
+  const dustRef = useRef(null);
+  
   const scroll = useScroll();
-  const { size } = useThree();
+  const { size, viewport } = useThree();
   const isMobile = size.width < 768;
 
   const lastActivePage = useRef('home');
@@ -62,10 +64,21 @@ export default function ImmersiveParticles({ count = 3600, setPage, setScrollEl 
     current: new Float32Array(count * 3)
   }), [count]);
 
-  const responsiveScale = isMobile ? 0.75 : 1.1;
-  const particleSize = isMobile ? 0.045 : 0.025;
+  // Reduced background ambient dust particles to 80 for pure CPU optimization
+  const dustPositions = useMemo(() => {
+    const positions = new Float32Array(80 * 3);
+    for (let i = 0; i < 80; i++) {
+      positions[i * 3] = (THREE.MathUtils.randFloatSpread(10));
+      positions[i * 3 + 1] = (THREE.MathUtils.randFloatSpread(10));
+      positions[i * 3 + 2] = (THREE.MathUtils.randFloatSpread(8));
+    }
+    return positions;
+  }, []);
 
-  // Sync scroll element reference
+  const responsiveScale = isMobile ? 0.75 : 1.1;
+  // Slightly larger particle size to maintain visual density with lower counts
+  const particleSize = isMobile ? 0.05 : 0.035;
+
   useEffect(() => {
     if (setScrollEl && scroll.el) {
       setScrollEl(scroll.el);
@@ -78,56 +91,104 @@ export default function ImmersiveParticles({ count = 3600, setPage, setScrollEl 
     const points = pointsRef.current;
     const positionAttr = points.geometry.attributes.position;
     const scrollOffset = scroll.offset;
+    const elapsedTime = state.clock.getElapsedTime();
 
-    // A. Vertex Morphing (Shape transformation)
-    for (let i = 0; i < count * 3; i++) {
-      let targetValue = 0;
+    // Subtle breathing light
+    points.material.opacity = 0.65 + Math.sin(elapsedTime * 1.5) * 0.15;
+
+    const mouse3D = new THREE.Vector3(
+      (state.pointer.x * viewport.width) / 2,
+      (state.pointer.y * viewport.height) / 2,
+      0
+    );
+
+    const repulsionRadius = isMobile ? 0.5 : 0.95;
+    const repulsionStrength = isMobile ? 0.15 : 0.45;
+
+    // Squared Radius pre-calculated to bypass Math.sqrt inside loop
+    const radiusSq = repulsionRadius * repulsionRadius;
+
+    // C. Highly Optimized Physics Loop
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+
+      let targetX = 0, targetY = 0, targetZ = 0;
       if (scrollOffset < 0.5) {
         const t = scrollOffset * 2.0;
-        targetValue = THREE.MathUtils.lerp(shapes.sphere[i], shapes.wave[i], t);
+        targetX = THREE.MathUtils.lerp(shapes.sphere[i3], shapes.wave[i3], t);
+        targetY = THREE.MathUtils.lerp(shapes.sphere[i3 + 1], shapes.wave[i3 + 1], t);
+        targetZ = THREE.MathUtils.lerp(shapes.sphere[i3 + 2], shapes.wave[i3 + 2], t);
       } else {
         const t = (scrollOffset - 0.5) * 2.0;
-        targetValue = THREE.MathUtils.lerp(shapes.wave[i], shapes.torus[i], t);
+        targetX = THREE.MathUtils.lerp(shapes.wave[i3], shapes.torus[i3], t);
+        targetY = THREE.MathUtils.lerp(shapes.wave[i3 + 1], shapes.torus[i3 + 1], t);
+        targetZ = THREE.MathUtils.lerp(shapes.wave[i3 + 2], shapes.torus[i3 + 2], t);
       }
-      positionAttr.array[i] = THREE.MathUtils.lerp(positionAttr.array[i], targetValue, 0.08);
+
+      const px = positionAttr.array[i3];
+      const py = positionAttr.array[i3 + 1];
+      const pz = positionAttr.array[i3 + 2];
+
+      const dx = px - mouse3D.x;
+      const dy = py - mouse3D.y;
+      const dz = pz - mouse3D.z;
+
+      // Squared distance calculation (No Math.sqrt here!)
+      const distSq = dx * dx + dy * dy + dz * dz;
+
+      let forceX = 0, forceY = 0, forceZ = 0;
+
+      // Only perform heavy square root calculation if particle is within squared radius
+      if (distSq < radiusSq) {
+        const distance = Math.sqrt(distSq); // Calculated ONLY for ~2% of particles close to mouse
+        const normalizedForce = (repulsionRadius - distance) / repulsionRadius;
+        forceX = (dx / (distance || 1)) * normalizedForce * repulsionStrength;
+        forceY = (dy / (distance || 1)) * normalizedForce * repulsionStrength;
+        forceZ = (dz / (distance || 1)) * normalizedForce * repulsionStrength;
+      }
+
+      positionAttr.array[i3] = THREE.MathUtils.lerp(px, targetX + forceX, 0.1);
+      positionAttr.array[i3 + 1] = THREE.MathUtils.lerp(py, targetY + forceY, 0.1);
+      positionAttr.array[i3 + 2] = THREE.MathUtils.lerp(pz, targetZ + forceZ, 0.1);
     }
     positionAttr.needsUpdate = true;
 
-    // B. Physical 3D Spatial Translation (Moving the mesh in space based on scroll)
-    let targetX = 0;
-    let targetY = 0;
-    let targetZ = 0;
+    // D. Ambient background dust drift (Optimized)
+    if (dustRef.current) {
+      dustRef.current.rotation.y = elapsedTime * 0.01;
+      dustRef.current.rotation.x = elapsedTime * 0.005;
+    }
+
+    // E. Physical Spatial Translation (Unchanged)
+    let groupX = 0, groupY = 0, groupZ = 0;
 
     if (isMobile) {
-      // Mobile Layout: Shift up and down vertically so text doesn't overlap particles
       if (scrollOffset < 0.5) {
         const t = scrollOffset * 2.0;
-        targetY = THREE.MathUtils.lerp(0, -0.8, t); // Pushes particles down for Section 2
+        groupY = THREE.MathUtils.lerp(0, -0.8, t);
       } else {
         const t = (scrollOffset - 0.5) * 2.0;
-        targetY = THREE.MathUtils.lerp(-0.8, 0.8, t); // Pulls particles up for Section 3
-        targetZ = THREE.MathUtils.lerp(0, -0.5, t);
+        groupY = THREE.MathUtils.lerp(-0.8, 0.8, t);
+        groupZ = THREE.MathUtils.lerp(0, -0.5, t);
       }
     } else {
-      // Desktop Layout: Shift left and right horizontally for asymmetrical designs
       if (scrollOffset < 0.5) {
         const t = scrollOffset * 2.0;
-        targetX = THREE.MathUtils.lerp(0, 1.4, t); // Shifts particles to the right for Section 2
-        targetY = THREE.MathUtils.lerp(0, -0.2, t);
+        groupX = THREE.MathUtils.lerp(0, 1.4, t);
+        groupY = THREE.MathUtils.lerp(0, -0.2, t);
       } else {
         const t = (scrollOffset - 0.5) * 2.0;
-        targetX = THREE.MathUtils.lerp(1.4, -1.4, t); // Shifts particles to the left for Section 3
-        targetY = THREE.MathUtils.lerp(-0.2, 0.3, t);
-        targetZ = THREE.MathUtils.lerp(0, -0.6, t);
+        groupX = THREE.MathUtils.lerp(1.4, -1.4, t);
+        groupY = THREE.MathUtils.lerp(-0.2, 0.3, t);
+        groupZ = THREE.MathUtils.lerp(0, -0.6, t);
       }
     }
 
-    // Apply smooth linear interpolations to the physical group position
-    points.position.x = THREE.MathUtils.lerp(points.position.x, targetX, 0.06);
-    points.position.y = THREE.MathUtils.lerp(points.position.y, targetY, 0.06);
-    points.position.z = THREE.MathUtils.lerp(points.position.z, targetZ, 0.06);
+    points.position.x = THREE.MathUtils.lerp(points.position.x, groupX, 0.06);
+    points.position.y = THREE.MathUtils.lerp(points.position.y, groupY, 0.06);
+    points.position.z = THREE.MathUtils.lerp(points.position.z, groupZ, 0.06);
 
-    // C. Detect active page and update UI
+    // F. Detect active page (Unchanged)
     let activePage = 'home';
     if (scrollOffset > 0.3 && scrollOffset <= 0.7) {
       activePage = 'work';
@@ -140,29 +201,51 @@ export default function ImmersiveParticles({ count = 3600, setPage, setScrollEl 
       setPage(activePage);
     }
 
-    // D. Fluid mouse interactions with parallax rotation
-    const hoverFactor = isMobile ? 0.1 : 0.25;
-    points.rotation.x = THREE.MathUtils.lerp(points.rotation.x, state.pointer.y * hoverFactor, 0.05);
-    points.rotation.y = THREE.MathUtils.lerp(points.rotation.y, state.pointer.x * hoverFactor + state.clock.getElapsedTime() * 0.03, 0.05);
+    // G. Camera tilt parallax (Optimized and smoothed)
+    const tiltFactor = isMobile ? 0.03 : 0.08;
+    points.rotation.x = THREE.MathUtils.lerp(points.rotation.x, state.pointer.y * tiltFactor, 0.05);
+    points.rotation.y = THREE.MathUtils.lerp(points.rotation.y, state.pointer.x * tiltFactor + elapsedTime * 0.015, 0.05);
   });
 
   return (
-    <points ref={pointsRef} scale={responsiveScale}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[shapes.sphere, 3]}
+    <group>
+      {/* 1. Main Interactive Morphing Particles */}
+      <points ref={pointsRef} scale={responsiveScale}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            args={[shapes.sphere, 3]}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          color="#c084fc"
+          size={particleSize}
+          sizeAttenuation={true}
+          transparent={true}
+          opacity={0.8}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
-      </bufferGeometry>
-      <pointsMaterial
-        color="#c084fc"
-        size={particleSize}
-        sizeAttenuation={true}
-        transparent={true}
-        opacity={0.8}
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
+      </points>
+
+      {/* 2. Secondary Background Floating Volumetric Dust */}
+      <points ref={dustRef}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            args={[dustPositions, 3]}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          color="#a78bfa"
+          size={isMobile ? 0.025 : 0.018}
+          sizeAttenuation={true}
+          transparent={true}
+          opacity={0.25}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
+    </group>
   );
 }
