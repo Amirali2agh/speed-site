@@ -197,16 +197,11 @@ export default function App() {
                     Tell us what is slowing your network down, what you want to build, or what needs to stay secure.
                     Speed Service is ready to help you design the next connection.
                   </p>
-                  <div className="mt-8 flex justify-center">
-                    <a
-                      href="mailto:hello@speedservice.example"
-                      className="rounded-full border border-white/10 bg-white/10 px-7 py-3 text-xs md:text-sm font-semibold tracking-widest uppercase text-white backdrop-blur-md transition hover:bg-white/15"
-                    >
-                      Contact Speed Service
-                    </a>
+                  <div className="mt-8 inline-flex rounded-full border border-white/10 bg-white/10 px-7 py-3 text-xs md:text-sm font-semibold tracking-widest uppercase text-white backdrop-blur-md">
+                    Contact details coming soon
                   </div>
                   <p className="mt-5 text-[10px] uppercase tracking-[0.2em] text-slate-600">
-                    Replace the demo email with your real contact address
+                    Your real email, phone, or social links can be added here.
                   </p>
                 </div>
               </section>
