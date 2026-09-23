@@ -1,9 +1,5 @@
 @import "tailwindcss";
 
-/* 
-  Reset all base elements to take up 100% of the viewport.
-  This is critical for WebGL to render without borders.
-*/
 html,
 body,
 #root {
@@ -11,6 +7,15 @@ body,
   padding: 0;
   width: 100vw;
   height: 100vh;
-  overflow: hidden; /* Prevents double scrollbar issues with the 3D scroll system */
-  background-color: #030712; /* Forces slate-950 background color globally */
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.08), transparent 28%),
+    radial-gradient(circle at 80% 70%, rgba(34, 211, 238, 0.06), transparent 30%),
+    #030712;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+::selection {
+  background: rgba(99, 102, 241, 0.35);
+  color: white;
 }
