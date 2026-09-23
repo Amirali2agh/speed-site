@@ -1,43 +1,46 @@
 import React from 'react';
 
-// Navbar accepts currentPage state, setPage state, and the physical scroll container reference
+// Navigation is intentionally lightweight so it stays responsive over the WebGL layer.
 export default function Navbar({ currentPage, setPage, scrollEl }) {
-  const menuItems = ['home', 'work', 'contact'];
+  const menuItems = [
+    { id: 'home', label: 'Home' },
+    { id: 'services', label: 'Services' },
+    { id: 'protocols', label: 'Protocols' },
+    { id: 'contact', label: 'Contact' },
+  ];
 
-  // Smoothly scrolls the WebGL container to the target section based on index
   const handleNavigation = (item, index) => {
     if (scrollEl) {
       scrollEl.scrollTo({
-        top: index * scrollEl.clientHeight, // Each section is exactly 100vh of the container height
-        behavior: 'smooth' // Triggers native smooth animation
+        top: index * scrollEl.clientHeight,
+        behavior: 'smooth',
       });
-      setPage(item); // Optimistically set local state
     }
+    setPage(item.id);
   };
 
   return (
-    <nav className="absolute top-0 left-0 w-full z-50 flex justify-between items-center px-6 md:px-12 py-8 pointer-events-auto">
-      {/* Brand logo */}
-      <div 
-        className="text-xl font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-pink-500 cursor-pointer"
-        onClick={() => handleNavigation('home', 0)}
+    <nav className="absolute top-0 left-0 w-full z-50 flex justify-between items-center px-6 md:px-12 py-7 pointer-events-auto">
+      <button
+        type="button"
+        className="text-xl md:text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-violet-300 via-indigo-300 to-cyan-300 cursor-pointer"
+        onClick={() => handleNavigation(menuItems[0], 0)}
+        aria-label="Go to Speed Service home"
       >
-        CREATIVE.LAB
-      </div>
+        SPEED SERVICE
+      </button>
 
-      {/* Navigation Links */}
-      <div className="flex gap-6 md:gap-10">
+      <div className="flex gap-3 sm:gap-5 md:gap-8">
         {menuItems.map((item, index) => (
           <button
-            key={item}
+            key={item.id}
+            type="button"
             onClick={() => handleNavigation(item, index)}
-            className={`text-xs md:text-sm font-semibold tracking-widest uppercase cursor-pointer transition-all duration-300 pb-1 ${
-              currentPage === item 
-                ? 'text-pink-400 border-b border-pink-400' 
-                : 'text-slate-400 hover:text-white'
-            }`}
+            className={`text-[10px] sm:text-xs md:text-sm font-semibold tracking-[0.14em] uppercase cursor-pointer transition-all duration-300 pb-1 ${currentPage === item.id
+              ? 'text-cyan-300 border-b border-cyan-300'
+              : 'text-slate-400 hover:text-white'}`}
           >
-            {item}
+            {item.label}
           </button>
         ))}
       </div>
