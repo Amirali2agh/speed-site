@@ -1,31 +1,43 @@
 import React, { useEffect, useState } from 'react';
-import { useProgress } from '@react-three/drei';
 
 export default function Preloader({ onComplete }) {
-  const { progress, active } = useProgress();
-  const [localProgress, setLocalProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [show, setShow] = useState(true);
   const [unmount, setUnmount] = useState(false);
 
   useEffect(() => {
-    let timer;
+    let progressTimer;
+    let finishTimer;
+    let unmountTimer;
 
-    if (localProgress < progress) {
-      timer = setTimeout(() => {
-        setLocalProgress((prev) => Math.min(prev + 1, progress));
-      }, 12);
-    } else if (!active && localProgress >= 100 && show) {
-      const fadeTimer = setTimeout(() => {
-        setShow(false);
-        onComplete();
-        setTimeout(() => setUnmount(true), 800);
-      }, 500);
+    // Deterministic loading animation so the intro cannot get stuck at 0%.
+    progressTimer = setInterval(() => {
+      setProgress((previous) => {
+        const next = Math.min(previous + (previous < 70 ? 4 : 2), 100);
 
-      return () => clearTimeout(fadeTimer);
-    }
+        if (next >= 100) {
+          clearInterval(progressTimer);
 
-    return () => clearTimeout(timer);
-  }, [progress, localProgress, active, show, onComplete]);
+          finishTimer = setTimeout(() => {
+            setShow(false);
+            onComplete();
+
+            unmountTimer = setTimeout(() => {
+              setUnmount(true);
+            }, 750);
+          }, 250);
+        }
+
+        return next;
+      });
+    }, 24);
+
+    return () => {
+      clearInterval(progressTimer);
+      clearTimeout(finishTimer);
+      clearTimeout(unmountTimer);
+    };
+  }, [onComplete]);
 
   if (unmount) return null;
 
@@ -39,7 +51,7 @@ export default function Preloader({ onComplete }) {
         <div className="absolute inset-0 rounded-full border border-cyan-400/10 animate-ping" />
         <div className="absolute w-16 h-16 rounded-full border-2 border-t-violet-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
         <span className="text-xl font-bold tracking-widest text-slate-300">
-          {Math.round(localProgress)}%
+          {progress}%
         </span>
       </div>
 
